@@ -1,0 +1,110 @@
+const express = require("express");
+const { createProxyMiddleware } = require("http-proxy-middleware");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Web Proxy</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background: #111827;
+            color: white;
+            text-align: center;
+            padding-top: 100px;
+          }
+
+          input {
+            width: 60%;
+            padding: 14px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+          }
+
+          button {
+            padding: 14px 20px;
+            margin-left: 8px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+          }
+
+          button:hover {
+            background: #1d4ed8;
+          }
+        </style>
+      </head>
+
+      <body>
+        <h1>Web Proxy</h1>
+
+        <p>Enter a website URL:</p>
+
+        <input
+          id="url"
+          type="text"
+          placeholder="https://example.com"
+        />
+
+        <button onclick="go()">Go</button>
+
+        <script>
+          function go() {
+            let url = document.getElementById("url").value.trim();
+
+            if (!url) {
+              alert("Enter a URL first.");
+              return;
+            }
+
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+              url = "https://" + url;
+            }
+
+            window.location.href =
+              "/proxy/" + encodeURIComponent(url);
+          }
+        </script>
+      </body>
+    </html>
+  `);
+});
+
+app.use("/proxy", (req, res, next) => {
+  let target = req.originalUrl.replace("/proxy/", "");
+
+  try {
+    target = decodeURIComponent(target);
+
+    const url = new URL(target);
+
+    if (!["http:", "https:"].includes(url.protocol)) {
+      return res.status(400).send("Only HTTP and HTTPS URLs are allowed.");
+    }
+
+    createProxyMiddleware({
+      target: url.origin,
+      changeOrigin: true,
+      followRedirects: true,
+      pathRewrite: () => url.pathname + url.search
+    })(req, res, next);
+
+  } catch {
+    res.status(400).send("Invalid URL.");
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Web proxy running on port ${PORT}`);
+});
